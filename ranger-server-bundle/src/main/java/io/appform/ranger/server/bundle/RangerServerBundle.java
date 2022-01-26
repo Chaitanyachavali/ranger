@@ -84,6 +84,16 @@ public abstract class RangerServerBundle<
         return ImmutableList.of();
     }
 
+    /*
+        Not a mandatory parameter, by default value would be true which means that
+        server will wait till all the given hubs are ready.
+        Letting the subclasses override if they wish to avoid this.
+     */
+    @SuppressWarnings("unused")
+    protected boolean waitTillAllHubsAreReadyToUse(U configuration) {
+        return true;
+    }
+
     protected abstract List<RangerHubClient<T, R>> withHubs(U configuration);
 
     protected abstract List<HealthCheck> withHealthChecks(U configuration);
@@ -117,7 +127,9 @@ public abstract class RangerServerBundle<
                 log.info("Starting the server manager");
                 lifecycleSignals.forEach(Signal::start);
                 hubs.forEach(RangerHubClient::start);
-                hubs.forEach(hub -> waitTillHubIsReady(hub));
+                if (waitTillAllHubsAreReadyToUse(configuration)) {
+                    hubs.forEach(hub -> waitTillHubIsReady(hub));
+                }
                 log.info("Started the server manager");
             }
 
