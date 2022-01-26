@@ -31,6 +31,9 @@ import java.util.List;
 public class TestSimpleUnshardedServiceFinder <T>
         extends SimpleUnshardedServiceFinderBuilder<TestNodeData, TestSimpleUnshardedServiceFinder<T>, Deserializer<TestNodeData>> {
 
+    public TestSimpleUnshardedServiceFinder() {
+    }
+
     @Override
     public SimpleUnshardedServiceFinder<TestNodeData> build() {
         return buildFinder();

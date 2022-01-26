@@ -82,7 +82,15 @@ public class RangerTestUtils {
         Only applicable for initial node population using hub of finders. Works when you intend to start the finder hub with nodes in 'em.
      */
     public static <T, R extends ServiceRegistry<T>> void sleepUntilHubStarts(ServiceFinderHub<T, R> hub){
-        await().pollDelay(Duration.ofSeconds(3)).until(() -> hub.getServiceDataSource() != null &&
-                hub.getFinders().get().values().stream().noneMatch(finder -> finder.getServiceRegistry().nodeList().isEmpty()));
+        sleepUntilFindersAreCreated(hub);
+        await().pollDelay(Duration.ofSeconds(3))
+                .until(() -> hub.getServiceDataSource().services().stream()
+                        .map(s -> hub.getFinders().get().get(s))
+                        .allMatch(finder -> finder.getServiceRegistry().getInitialRefreshCompleted().get()));
+    }
+
+    public static <T, R extends ServiceRegistry<T>> void sleepUntilFindersAreCreated(ServiceFinderHub<T, R> hub){
+        await().pollDelay(Duration.ofSeconds(1))
+            .until(() -> hub.getServiceDataSource().services().size() == hub.getFinders().get().values().size());
     }
 }
