@@ -17,10 +17,15 @@ package io.appform.ranger.server.bundle;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.rholder.retry.RetryerBuilder;
 import com.google.common.collect.ImmutableList;
 import io.appform.ranger.client.RangerHubClient;
+import io.appform.ranger.core.finder.ServiceFinder;
+import io.appform.ranger.core.finderhub.ServiceDataSource;
+import io.appform.ranger.core.model.Service;
 import io.appform.ranger.core.model.ServiceRegistry;
 import io.appform.ranger.core.signals.Signal;
+import io.appform.ranger.core.util.Exceptions;
 import io.appform.ranger.server.bundle.resources.RangerResource;
 import io.appform.ranger.server.bundle.rotation.BirTask;
 import io.appform.ranger.server.bundle.rotation.OorTask;
@@ -112,6 +117,7 @@ public abstract class RangerServerBundle<
                 log.info("Starting the server manager");
                 lifecycleSignals.forEach(Signal::start);
                 hubs.forEach(RangerHubClient::start);
+                hubs.forEach(hub -> waitTillHubIsReady(hub));
                 log.info("Started the server manager");
             }
 
@@ -125,5 +131,33 @@ public abstract class RangerServerBundle<
         });
         healthChecks.forEach(healthCheck -> environment.healthChecks().register(healthCheck.getClass().getName(), healthCheck));
         environment.jersey().register(new RangerResource<>(hubs));
+    }
+
+    /*
+        Checks to verify if the hub is ready to use:
+          - Each service registry of all finders should have initial refresh completed.
+
+        Why do we have to make the server wait till all hubs are ready? Since fetching the
+        ServiceNodes is asynchronous, keeping it ready before the first incoming request.
+     */
+    private void waitTillHubIsReady(RangerHubClient<T,R> client) {
+        ServiceDataSource serviceDataSource = client.getHub().getServiceDataSource();
+
+        for (Service service : serviceDataSource.services()) {
+            try {
+                ServiceFinder<T, R> serviceRegistry = RetryerBuilder.<ServiceFinder<T, R>>newBuilder()
+                    .retryIfResult(r -> r == null)
+                    .build()
+                    .call(() -> client.getHub().getFinders().get().get(service));
+                RetryerBuilder.<Boolean>newBuilder()
+                    .retryIfResult(r -> r == null || !r)
+                    .build()
+                    .call(() -> serviceRegistry.getServiceRegistry()
+                        .getInitialRefreshCompleted().get());
+            } catch (Exception ex) {
+                Exceptions
+                    .illegalState("Could not perform initial state for service: " + service.getServiceName(), ex);
+            }
+        }
     }
 }

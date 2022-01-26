@@ -15,6 +15,7 @@
  */
 package io.appform.ranger.client;
 
+import io.appform.ranger.core.finderhub.ServiceFinderHub;
 import io.appform.ranger.core.model.*;
 
 import java.util.Collection;
@@ -52,4 +53,6 @@ public interface RangerHubClient<T, R extends ServiceRegistry<T>> {
             final Service service,
             final Predicate<T> criteria,
             final ShardSelector<T, R> shardSelector);
+
+    ServiceFinderHub<T, R> getHub();
 }
